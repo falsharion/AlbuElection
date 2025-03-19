@@ -1,7 +1,10 @@
 "use client"
 import React from 'react';
-import Lottie from 'lottie-react';
+import dynamic from 'next/dynamic';
 import voteSuccessAnimation from '../../../public/lottie/vot-success.json';
+
+// Dynamically import Lottie to ensure it's only rendered on the client
+const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
 const VoteConfirmationPage = () => {
   return (
