@@ -1,101 +1,274 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '../lib/supabaseClient';
+import * as yup from 'yup';
+import Image from 'next/image';
+
+const emailSchema = yup
+  .string()
+  .email()
+  .test('is-babcock', 'Input your school email', (value) => value && value.endsWith('@student.babcock.edu.ng'));
+
+export default function HomePage() {
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [matric, setMatric] = useState('');
+  const [studentName, setStudentName] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [checkLoading, setCheckLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const [hasVoted, setHasVoted] = useState(false);
+
+  useEffect(() => {
+    if (cooldown > 0) {
+      const interval = setInterval(() => {
+        setCooldown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [cooldown]);
+
+  const checkMatric = async () => {
+    setCheckLoading(true);
+    setError('');
+    setHasVoted(false);
+
+    const { data, error } = await supabase
+      .from('students')
+      .select('name, has_voted')
+      .eq('matric_number', matric.trim())
+      .maybeSingle();
+
+    setCheckLoading(false);
+
+    if (error || !data) {
+      setError("This matric number can't be found");
+      setStudentName('');
+      return false;
+    } else {
+      setStudentName(data.name);
+
+      if (data.has_voted) {
+        setHasVoted(true);
+        setError("You have already voted in this election");
+        return false;
+      }
+
+      return true;
+    }
+  };
+
+  const handleSendOTP = async () => {
+    if (cooldown > 0) return;
+
+    setError('');
+    try {
+      await emailSchema.validate(email);
+    } catch (err) {
+      setError(err.message);
+      return;
+    }
+
+    const validMatric = await checkMatric();
+    if (!validMatric) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, matric }),
+      });
+
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || 'Failed to send OTP. Please try again.');
+      }
+
+      setOtpSent(true);
+      setCooldown(300); // Set cooldown for 5 minutes (300 seconds)
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    setError('');
+    if (!otp) {
+      setError('Please enter the OTP.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp }),
+      });
+
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || 'Failed to verify OTP. Please try again.');
+      }
+
+      router.push('/vote');
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className=" max-w-md text-black mx-auto mt-10 p-4 px-6 ">
+      <Image
+        src="/albulogo.jpg"
+        alt="Election Logo"
+        className=' m-auto pb-4'
+        width={180}
+        height={100}
+        priority
+      />
+      <h1 className="text-xl font-bold mb-4">Sign In</h1>
+      <p className='text-gray-500 text-sm pb-5'>Note: Check your inbox or spam folder of your Babcock email for the otp after requesting </p>
+      {error && <p className="text-red-500 mb-4">{error}</p>}
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <div className="mb-6">
+        <label className="inline-block px-2 py-1 mb-2 text-xs font-semibold tracking-wide text-blue-950 uppercase bg-blue-50 rounded-md">
+          Email Address
+        </label>
+        <div className="relative">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block transition-all duration-200 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+            placeholder="example@student.babcock.edu.ng"
+            disabled={hasVoted}
+            required
+          />
+          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+            </svg>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+      </div>
+
+      <div className="mb-6">
+        <label className="inline-block px-2 py-1 mb-2 text-xs font-semibold tracking-wide text-blue-950 uppercase bg-blue-50 rounded-md">
+          Matric Number
+        </label>
+        <div className="flex">
+          <div className="relative flex-grow">
+            <input
+              type="text"
+              value={matric}
+              onChange={(e) => setMatric(e.target.value)}
+              className="w-full px-4 pl-8 py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block transition-all duration-200"
+              placeholder="Enter matric number"
+              required
+            />
+            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"></path>
+              </svg>
+            </div>
+          </div>
+          <button
+            onClick={checkMatric}
+            className="ml-0 px-5 py-2.5 bg-blue-950 hover:bg-blue-800 text-white text-sm font-medium rounded-r-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center justify-center min-w-[100px]"
+            disabled={checkLoading}
+          >
+            {checkLoading ? (
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : null}
+            {checkLoading ? 'Checking...' : 'Check'}
+          </button>
+        </div>
+      </div>
+      {studentName && (
+
+        <div className="mb-4">
+          <label className="inline-block px-2 py-1 mb-2 text-xs font-semibold tracking-wide text-blue-950 uppercase bg-blue-50 rounded-md">Name</label>
+          <input
+            type="text"
+            value={studentName}
+            readOnly
+            className="w-full px-4 uppercase py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block transition-all duration-200 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+
+        </div>
+      )}
+
+      {!otpSent && !hasVoted && studentName && (
+        <button
+          onClick={handleSendOTP}
+          className="bg-blue-800 rounded-lg text-white px-4 py-2 w-full"
+          disabled={loading || cooldown > 0 || hasVoted}
         >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          {cooldown > 0 ? `Retry in ${cooldown}s` : (loading ? 'Sending OTP...' : 'Send OTP')}
+        </button>
+      )}
+
+{otpSent && !hasVoted && (
+  <div className="mb-6">
+    <label className="inline-block px-2 py-1 mb-2 text-xs font-semibold tracking-wide text-blue-950 uppercase bg-blue-50 rounded-md">
+      Enter OTP
+    </label>
+    <div className="relative">
+      <input
+        type="text"
+        value={otp}
+        onChange={(e) => setOtp(e.target.value)}
+        className="w-full px-4 pl-8 py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block transition-all duration-200"
+        placeholder="Enter the OTP received"
+      />
+      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+        </svg>
+      </div>
+    </div>
+    <button
+      onClick={handleVerifyOTP}
+      className="mt-4 w-full px-5 py-2.5 bg-blue-950 hover:bg-blue-800 text-white text-sm font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center justify-center"
+      disabled={loading}
+    >
+      {loading && (
+        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      )}
+      {loading ? 'Verifying...' : 'Verify OTP'}
+    </button>
+  </div>
+)}
+
+      {hasVoted && (
+        <div className="p-4 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">
+          <p className="font-medium">You have already voted in this election.</p>
+          <p className="text-sm mt-1">Each student is allowed to vote only once.</p>
+        </div>
+      )}
     </div>
   );
-}
+};
