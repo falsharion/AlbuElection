@@ -1,7 +1,9 @@
+
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabaseClient';
 import * as jose from 'jose';
+import logger from '@/utils/logger';
 import VotePage from './client-vote-paje'; 
 
 export const config = {
@@ -17,6 +19,7 @@ export default async function VotePageServer() {
     
     if (!tokenCookie || !tokenCookie.value) {
       // Redirect to home if not signed in
+      logger.log('No token found, redirecting to home');
       return redirect('/');
     }
     
@@ -36,11 +39,11 @@ export default async function VotePageServer() {
       studentMatric = payload.matric || '';
       
       if (!studentEmail || !payload.verified) {
-        console.error('Invalid token payload:', payload);
+        logger.error('Invalid token payload:', payload);
         return redirect('/');
       }
     } catch (error) {
-      console.error('Invalid token:', error);
+      logger.error('Invalid token:', error);
       return redirect('/');
     }
     
@@ -55,12 +58,13 @@ export default async function VotePageServer() {
       .single();
     
     if (studentError) {
-      console.error('Error fetching student data:', studentError);
+      logger.error('Error fetching student data:', studentError);
       return redirect('/');
     }
     
     if (student && student.has_voted) {
       // Student has already voted, redirect to a message page
+      logger.log('Student has already voted, redirecting');
       return redirect('/already-voted');
     }
     
@@ -74,7 +78,7 @@ export default async function VotePageServer() {
       `);
     
     if (error) {
-      console.error('Error fetching posts:', error);
+      logger.error('Error fetching posts:', error);
       // Pass the error to the client component to display
       return <VotePage serverPosts={[]} studentEmail={studentEmail} studentMatric={studentMatric} />;
     }
@@ -82,7 +86,7 @@ export default async function VotePageServer() {
     // Pass the data to the client component
     return <VotePage serverPosts={posts} studentEmail={studentEmail} studentMatric={studentMatric} />;
   } catch (error) {
-    console.error('Unexpected error in VotePageServer:', error);
+    logger.error('Unexpected error in VotePageServer:', error);
     return redirect('/error?message=Something+went+wrong');
   }
 }

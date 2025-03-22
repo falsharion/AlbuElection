@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import AdminProtectedRoute from '@/components/AdminProtectedRoute';
 import { useRouter } from 'next/navigation';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import logger from '@/utils/logger';
 
 function AdminDashboard() {
   const [posts, setPosts] = useState([]);
@@ -24,7 +25,7 @@ function AdminDashboard() {
       // Redirect to login page
       router.push('/admin-login');
     } catch (error) {
-      console.error('Error signing out:', error.message);
+      logger.error('Error signing out:', error.message);
     }
   };
 
@@ -62,7 +63,7 @@ function AdminDashboard() {
             studentVotesData = data;
           }
         } catch (voteError) {
-          console.error('Could not fetch vote data:', voteError);
+          logger.error('Could not fetch vote data:', voteError);
           // Continue with the posts data we have
         }
         
@@ -93,7 +94,7 @@ function AdminDashboard() {
         
         setPosts(postsWithVotes);
       } catch (err) {
-        console.error('Error fetching results:', err);
+        logger.error('Error fetching results:', err);
         setError('Failed to load voting results');
       } finally {
         setLoading(false);

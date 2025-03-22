@@ -5,6 +5,9 @@ import '../globals.css';
 export const metadata = {
   title: 'ALBU Election App',
   description: 'ALBU Election',
+  icons: {
+    icon: '/albulogo.jpg',
+  },
 };
 
 export default function RootLayout({ children }) {

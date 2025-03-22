@@ -2,6 +2,7 @@
 import React from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import logger from '@/utils/logger';
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false }); 
 
@@ -12,7 +13,7 @@ export default function AlreadyVotedPage() {
     fetch('/lottie/already-voted.json')
       .then(response => response.json())
       .then(data => setAnimationData(data))
-      .catch(error => console.error('Error loading animation:', error));
+      .catch(error => logger.error('Error loading animation:', error));
   }, []);
 
   return (

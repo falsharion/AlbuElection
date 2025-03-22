@@ -20,6 +20,22 @@ export default function VotePage({ serverPosts, studentEmail, studentMatric }) {
     matric: studentMatric || ''
   });
 
+  // Handle body scroll lock when modal is shown
+  useEffect(() => {
+    if (showModal) {
+      // Prevent scrolling on the background
+      document.body.style.overflow = 'hidden';
+    } else {
+      // Re-enable scrolling when modal is closed
+      document.body.style.overflow = 'auto';
+    }
+    
+    // Cleanup function to ensure scrolling is re-enabled when component unmounts
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [showModal]);
+
   useEffect(() => {
     // Check if user has already voted
     const checkVoteStatus = async () => {
@@ -218,7 +234,6 @@ export default function VotePage({ serverPosts, studentEmail, studentMatric }) {
                 <h2 className="text-2xl font-bold">{post.name}</h2>
                 <p className="text-blue-100 text-sm">Select one candidate</p>
               </div>
-              {/* border-gray-500/30 rounded-lg  */}
               <div className="p-6">
                 {post.candidates && post.candidates.length > 0 ? (
                   <div className="space-y-4">
@@ -238,8 +253,9 @@ export default function VotePage({ serverPosts, studentEmail, studentMatric }) {
                               <Image 
                                 src={candidate.image_url} 
                                 alt={candidate.name}
-                                layout="fill"
-                                objectFit="cover"
+                                fill
+                                sizes="64px"
+                                style={{objectFit: 'cover'}}
                                 className="rounded-lg"
                                 onError={(e) => {
                                   e.target.src = '/placeholder-avatar.png'; // Fallback image
@@ -299,56 +315,63 @@ export default function VotePage({ serverPosts, studentEmail, studentMatric }) {
       {/* Confirmation Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
-            <h3 className="text-2xl font-bold mb-4 text-blue-950">Confirm Your Vote</h3>
-            
-            <div className="bg-blue-50 p-4 rounded-lg mb-6">
-              <p className="text-gray-600 italic">You are about to submit your vote for the following positions:</p>
-              
-              <ul className="mt-4 space-y-2">
-                {posts.map(post => {
-                  const selectedCandidate = post.candidates?.find(c => c.id === selections[post.id]);
-                  return selections[post.id] ? (
-                    <li key={post.id} className="flex justify-between">
-                      <span className="font-medium">{post.name}:</span>
-                      <span className="text-blue-950 text-end ">{selectedCandidate?.name}</span>
-                    </li>
-                  ) : null;
-                })}
-              </ul>
+          <div className="bg-white rounded-xl max-w-md w-full shadow-2xl max-h-[90vh] flex flex-col">
+            {/* Modal Header - Fixed */}
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-2xl font-bold text-blue-950">Confirm Your Vote</h3>
             </div>
             
-            <p className="mb-6 text-gray-600 italic text-sm">This action cannot be undone. Your vote is anonymous and secure.</p>
+            {/* Modal Content - Scrollable */}
+            <div className="p-6 overflow-y-auto flex-grow">
+              <div className="bg-blue-50 p-4 rounded-lg mb-6">
+                <p className="text-gray-600 italic">You are about to submit your vote for the following positions:</p>
+                
+                <ul className="mt-4 space-y-2">
+                  {posts.map(post => {
+                    const selectedCandidate = post.candidates?.find(c => c.id === selections[post.id]);
+                    return selections[post.id] ? (
+                      <li key={post.id} className="flex justify-between">
+                        <span className="font-medium">{post.name}:</span>
+                        <span className="text-blue-950 text-end">{selectedCandidate?.name}</span>
+                      </li>
+                    ) : null;
+                  })}
+                </ul>
+              </div>
+              
+              <p className="mb-6 text-gray-600 italic text-sm">This action cannot be undone. Your vote is anonymous and secure.</p>
+            </div>
             
-            <div className="flex flex-col sm:flex-row sm:justify-end space-y-3 sm:space-y-0 sm:space-x-3">
-              <button 
-                onClick={() => setShowModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm hover:bg-gray-100 transition-colors text-gray-700"
-                disabled={isSubmitting}
-              >
-                Go Back
-              </button>
-              <button 
-                onClick={submitVotes}
-                className="px-4 py-2 bg-blue-950 text-white rounded-lg shadow-md hover:bg-blue-800 transition-colors flex items-center justify-center"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Submitting...
-                  </>
-                ) : 'Confirm My Vote'}
-              </button>
+            {/* Modal Footer - Fixed */}
+            <div className="p-6 border-t border-gray-200">
+              <div className="flex flex-col sm:flex-row sm:justify-end space-y-3 sm:space-y-0 sm:space-x-3">
+                <button 
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm hover:bg-gray-100 transition-colors text-gray-700"
+                  disabled={isSubmitting}
+                >
+                  Go Back
+                </button>
+                <button 
+                  onClick={submitVotes}
+                  className="px-4 py-2 bg-blue-950 text-white rounded-lg shadow-md hover:bg-blue-800 transition-colors flex items-center justify-center"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Submitting...
+                    </>
+                  ) : 'Confirm My Vote'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
     </div>
   );
-}
-
-
+};

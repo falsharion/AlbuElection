@@ -1,6 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import logger from '@/utils/logger';
 
 // Initialize Supabase with admin privileges for the API route
 const supabaseAdmin = createClient(
@@ -13,7 +14,7 @@ export async function POST(req) {
     // Get data from request
     const { votes, matric } = await req.json();
     
-    console.log('Received vote submission:', { matric, votesCount: votes.length });
+    logger.log('Received vote submission:', { matric, votesCount: votes.length });
     
     if (!votes || !votes.length || !matric) {
       return NextResponse.json({ error: 'Invalid vote data' }, { status: 400 });
@@ -27,7 +28,7 @@ export async function POST(req) {
       .single();
     
     if (studentError) {
-      console.error('Error checking student:', studentError);
+      logger.error('Error checking student:', studentError);
       return NextResponse.json({ error: 'Could not verify student status' }, { status: 500 });
     }
     
@@ -53,7 +54,7 @@ export async function POST(req) {
           .single();
         
         if (fetchError) {
-          console.error('Error fetching candidate:', fetchError);
+          logger.error('Error fetching candidate:', fetchError);
           return;
         }
         
@@ -65,7 +66,7 @@ export async function POST(req) {
           .eq('id', vote.candidate_id);
         
         if (updateError) {
-          console.error('Error updating candidate votes:', updateError);
+          logger.error('Error updating candidate votes:', updateError);
         }
       };
       
@@ -73,7 +74,7 @@ export async function POST(req) {
     }
     
     // Insert the single votes record with all votes as JSON
-    console.log('Inserting votes as JSON...');
+    logger.log('Inserting votes as JSON...');
     const { error: votesError } = await supabaseAdmin
       .from('student_votes') // New table name
       .insert({
@@ -82,7 +83,7 @@ export async function POST(req) {
       });
     
     if (votesError) {
-      console.error('Error inserting votes:', votesError);
+      logger.error('Error inserting votes:', votesError);
       return NextResponse.json({ error: 'Failed to record votes: ' + votesError.message }, { status: 500 });
     }
     
@@ -90,19 +91,19 @@ export async function POST(req) {
     await Promise.all(candidateUpdatePromises);
     
     // Update student has_voted status
-    console.log('Updating student voted status...');
+    logger.log('Updating student voted status...');
     const { error: updateError } = await supabaseAdmin
       .from('students')
       .update({ has_voted: true })
       .eq('matric_number', matric);
     
     if (updateError) {
-      console.error('Error updating student has_voted:', updateError);
+      logger.error('Error updating student has_voted:', updateError);
       return NextResponse.json({ error: 'Failed to update student status: ' + updateError.message }, { status: 500 });
     }
     
     // Vote process completed
-    console.log('Vote process completed successfully');
+    logger.log('Vote process completed successfully');
     
     return NextResponse.json({ 
       success: true,
@@ -110,7 +111,7 @@ export async function POST(req) {
       logoutRequired: true
     });
   } catch (err) {
-    console.error('Unexpected error:', err);
+    logger.error('Unexpected error:', err);
     return NextResponse.json({ error: 'Server error processing votes' }, { status: 500 });
   }
 }

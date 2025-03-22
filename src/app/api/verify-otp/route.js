@@ -1,12 +1,15 @@
+
+
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import * as jose from 'jose';
+import logger from '@/utils/logger';
 
 export async function POST(req) {
   try {
     const { email, otp } = await req.json();
     
-    console.log('Received verification request:', { email, otp });
+    logger.log('Received verification request:', { email, otp });
     
     if (!email || !otp) {
       return NextResponse.json({ error: 'Email and OTP are required' }, { status: 400 });
@@ -16,7 +19,7 @@ export async function POST(req) {
     const cleanEmail = email.trim().toLowerCase();
     const cleanOtp = otp.trim();
     
-    console.log('Cleaned inputs:', { cleanEmail, cleanOtp });
+    logger.log('Cleaned inputs:', { cleanEmail, cleanOtp });
     
     // Retrieve the OTP record for this email and OTP
     const { data, error } = await supabase
@@ -26,10 +29,10 @@ export async function POST(req) {
       .eq('otp', cleanOtp)
       .maybeSingle();
     
-    console.log('OTP verification result:', { data, error });
+    logger.log('OTP verification result:', { data, error });
     
     if (error) {
-      console.error('OTP verification error:', error);
+      logger.error('OTP verification error:', error);
       return NextResponse.json({
         error: 'Database error during verification',
         details: error
@@ -48,7 +51,7 @@ export async function POST(req) {
     
     if (now > expiresAt) {
       return NextResponse.json({
-        error: 'OTP has expired. Please request a new one.'
+        error: 'OTP has expired. Please request a new OTP in the next 1 hour by refreshing, you can close this page for now.'
       }, { status: 400 });
     }
     
@@ -65,7 +68,7 @@ export async function POST(req) {
         .maybeSingle();
       
       if (studentError || !studentData) {
-        console.error('Error retrieving student data:', studentError);
+        logger.error('Error retrieving student data:', studentError);
         return NextResponse.json({
           error: 'Could not verify student information'
         }, { status: 500 });
@@ -81,9 +84,9 @@ export async function POST(req) {
       .eq('id', data.id);
     
     if (deleteError) {
-      console.error('Error deleting OTP:', deleteError);
+      logger.error('Error deleting OTP:', deleteError);
     } else {
-      console.log('OTP deleted successfully');
+      logger.log('OTP deleted successfully');
     }
     
     // Create a JWT token with jose library
@@ -101,7 +104,7 @@ export async function POST(req) {
       .setExpirationTime('1h')
       .sign(secret);
     
-    console.log('Generated JWT token (partial):', token.substring(0, 20) + '...');
+    logger.log('Generated JWT token (partial):', token.substring(0, 20) + '...');
     
     // Create the response
     const response = NextResponse.json({
@@ -121,7 +124,7 @@ export async function POST(req) {
     
     return response;
   } catch (error) {
-    console.error('Unexpected verification error:', error);
+    logger.error('Unexpected verification error:', error);
     return NextResponse.json({
       error: 'Server error during verification',
       details: error.message
