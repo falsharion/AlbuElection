@@ -60,15 +60,31 @@ export async function POST(req) {
     const otp = crypto.randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiration
     
-    const { error: dbError } = await supabase
-      .from('otps')
-      .insert([{ email, matric, otp, expires_at: expiresAt.toISOString() }]);
+// Retry logic for OTP storage
+let retries = 3;
+let storageSuccess = false;
+let dbError;
 
-    if (dbError) {
-      logger.error('Failed to store OTP:', dbError);
-      return NextResponse.json({ error: 'Failed to store OTP' }, { status: 500 });
-    }
+while (retries > 0 && !storageSuccess) {
+  const { error } = await supabase
+    .from('otps')
+    .insert([{ email, matric, otp, expires_at: expiresAt.toISOString() }]);
+  
+  if (!error) {
+    storageSuccess = true;
+  } else {
+    dbError = error;
+    retries--;
+    logger.warn(`OTP storage attempt failed. Retries left: ${retries}. Error:`, error);
+    // Wait before retrying
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+}
 
+if (!storageSuccess) {
+  logger.error('Failed to store OTP after multiple attempts:', dbError);
+  return NextResponse.json({ error: 'Failed to store OTP' }, { status: 500 });
+}
     // Send Email using Nodemailer
     let transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
