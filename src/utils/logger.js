@@ -6,8 +6,10 @@ const logger = {
     },
     error: (...args) => {
       console.error(...args);
+    },
+    warn: (...args) => {
+      console.warn(...args);  // Add this method
     }
   };
   
   export default logger;
-  
